@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/backend-usereuser.main.iml" filepath="$PROJECT_DIR$/.idea/modules/backend-usereuser.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/backend-usereuser.test.iml" filepath="$PROJECT_DIR$/.idea/modules/backend-usereuser.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/usereuser.iml" filepath="$PROJECT_DIR$/.idea/usereuser.iml" />
+    </modules>
+  </component>
+</project>

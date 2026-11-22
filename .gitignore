@@ -1,0 +1,9 @@
+/Back-end/.gradle/
+/Back-end/build/
+/Back-end/secrets/
+/Back-end/.env
+/Back-end/uploads/
+/font-end/node_modules/
+/font-end/.angular/
+/font-end/dist/
+/font-end/.env
