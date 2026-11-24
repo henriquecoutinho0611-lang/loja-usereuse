@@ -20,7 +20,12 @@ public class ShippingService {
     }
 
     public ShippingQuoteResponse quote(String zipCode) {
-        return quoteAddress(lookupAddress(validateZipCode(zipCode)));
+        try {
+            return quoteAddress(lookupAddress(validateZipCode(zipCode)));
+        } catch (ViaCepClient.ZipCodeLookupException ex) {
+            return new ShippingQuoteResponse(null, null, false, null, null, "CONTACT",
+                    "Não foi possível confirmar a região pelo CEP no momento. O frete e o prazo serão combinados com a loja.");
+        }
     }
 
     public ShippingQuoteResponse quoteForOrder(String zipCode) {

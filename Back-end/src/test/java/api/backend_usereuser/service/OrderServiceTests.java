@@ -3,13 +3,11 @@ package api.backend_usereuser.service;
 import api.backend_usereuser.dto.OrderRequest;
 import api.backend_usereuser.dto.OrderResponse;
 import api.backend_usereuser.dto.ShippingQuoteResponse;
-import api.backend_usereuser.entity.IdempotencyRecordEntity;
 import api.backend_usereuser.entity.OrderEntity;
 import api.backend_usereuser.entity.ProductEntity;
 import api.backend_usereuser.entity.Role;
 import api.backend_usereuser.entity.UserEntity;
 import api.backend_usereuser.mapper.OrderMapper;
-import api.backend_usereuser.repository.IdempotencyRecordRepository;
 import api.backend_usereuser.repository.OrderRepository;
 import api.backend_usereuser.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -30,7 +28,6 @@ class OrderServiceTests {
     @Test
     void includesConfiguredFixedShippingInTheOrderTotal() {
         OrderRepository orders = mock(OrderRepository.class);
-        IdempotencyRecordRepository idempotency = mock(IdempotencyRecordRepository.class);
         ProductService products = mock(ProductService.class);
         UserRepository users = mock(UserRepository.class);
         OrderMapper mapper = mock(OrderMapper.class);
@@ -54,8 +51,6 @@ class OrderServiceTests {
         product.setUpholsteryColors(List.of());
         when(users.findByEmailIgnoreCase("cliente@example.com")).thenReturn(Optional.of(customer));
         when(products.getActiveEntity(productId)).thenReturn(product);
-        when(idempotency.findByScopeKeyAndIdempotencyKey(customer.getId().toString(), "key"))
-                .thenReturn(Optional.empty());
         when(shipping.quoteForOrder("01001000"))
                 .thenReturn(new ShippingQuoteResponse(new BigDecimal("75.50"), null, false,
                         "São Paulo", "SP", "SAO_PAULO_CITY", "Frete fixo"));
@@ -65,15 +60,37 @@ class OrderServiceTests {
                         new BigDecimal("200.50"), null, null, new BigDecimal("75.50"),
                         "SAO_PAULO_CITY", List.of()));
 
-        OrderService service = new OrderService(orders, idempotency, products, users, mapper, shipping);
+        OrderService service = new OrderService(orders, products, users, mapper, shipping);
         OrderRequest request = new OrderRequest(null, "01001000", "Rua das Flores, 1",
                 List.of(new OrderRequest.Item(productId, 1, null)));
 
-        service.create(request, "key", "cliente@example.com");
+        service.create(request, "cliente@example.com");
 
         ArgumentCaptor<OrderEntity> savedOrder = ArgumentCaptor.forClass(OrderEntity.class);
         verify(orders).save(savedOrder.capture());
         assertEquals(new BigDecimal("200.50"), savedOrder.getValue().getTotal());
         assertEquals(new BigDecimal("75.50"), savedOrder.getValue().getShippingCost());
+    }
+
+    @Test
+    void persistsOrderStatusBeforeReturningTheUpdatedStatus() {
+        OrderRepository orders = mock(OrderRepository.class);
+        UUID orderId = UUID.randomUUID();
+        OrderEntity order = new OrderEntity();
+        order.setId(orderId);
+        order.setStatus("RECEIVED");
+        order.setItems(List.of());
+        when(orders.findById(orderId)).thenReturn(Optional.of(order));
+        when(orders.saveAndFlush(order)).thenReturn(order);
+
+        OrderService service = new OrderService(orders,
+                mock(ProductService.class), mock(UserRepository.class), mock(OrderMapper.class),
+                mock(ShippingService.class));
+
+        var response = service.updateStatus(orderId, "IN_PRODUCTION");
+
+        verify(orders).saveAndFlush(order);
+        assertEquals("IN_PRODUCTION", order.getStatus());
+        assertEquals("IN_PRODUCTION", response.status());
     }
 }

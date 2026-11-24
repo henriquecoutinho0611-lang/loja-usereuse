@@ -6,6 +6,7 @@ import api.backend_usereuser.entity.ProductEntity;
 import api.backend_usereuser.exception.ApiException;
 import api.backend_usereuser.mapper.ProductMapper;
 import api.backend_usereuser.repository.ProductRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,31 +20,76 @@ import java.util.UUID;
 public class ProductService {
     private final ProductRepository products;
     private final ProductMapper mapper;
-    public ProductService(ProductRepository products, ProductMapper mapper) { this.products = products; this.mapper = mapper; }
+    public ProductService(ProductRepository products, ProductMapper mapper) {
+        this.products = products;
+        this.mapper = mapper; }
+
     @Transactional(readOnly = true)
-    public List<ProductResponse> listPublic() { return products.findAllByActiveTrueOrderByFeaturedDescCreatedAtDesc().stream().map(mapper::toResponse).toList(); }
+    public List<ProductResponse> listPublic() {
+
+        return products.findAllByActiveTrueOrderByFeaturedDescCreatedAtDesc().stream().map(mapper::toResponse).toList();
+    }
+
     @Transactional(readOnly = true)
-    public List<ProductResponse> listForMerchant() { return products.findAllByOrderByCreatedAtDesc().stream().map(mapper::toResponse).toList(); }
+    public List<ProductResponse> listForMerchant() {
+
+        return products.findAllByOrderByCreatedAtDesc().stream().map(mapper::toResponse).toList();
+    }
+
     @Transactional
     public ProductResponse create(ProductRequest request) {
         ProductEntity product = mapper.toEntity(request); normalize(product);
         return mapper.toResponse(products.save(product));
+
     }
+
     @Transactional
     public ProductResponse update(UUID id, ProductRequest request) {
-        ProductEntity product = getProduct(id); mapper.update(request, product); normalize(product);
-        return mapper.toResponse(product);
+
+        ProductEntity product = products.findById(id).orElseThrow(() -> new EntityNotFoundException("Product not found"+ id));
+
+        product.setTitle(request.title());
+        product.setDescription(request.description());
+        product.setPrice(request.price());
+        product.setFeatured(request.featured());
+        product.setDepartment(request.department());
+        product.setOldPrice(request.oldPrice());
+        product.setImage(request.image());
+        product.setAmbientImage(request.ambientImage());
+        product.setIronColors(request.ironColors());
+        product.setWoodColors(request.woodColors());
+        product.setWoodTypes(request.woodTypes());
+        product.setUpholsteryColors(request.upholsteryColors());
+
+        return mapper.toResponse(products.save(product));
+
+
     }
+
     @Transactional
-    public void delete(UUID id) { ProductEntity product = getProduct(id); product.setActive(false); product.setFeatured(false); }
+    public void delete(UUID id) {
+
+         if(!products.existsById(id)) {
+             throw new ApiException(HttpStatus.NOT_FOUND, "Product not found");
+
+         }
+         products.deleteById(id);
+
+    }
+
+
+
     @Transactional(readOnly = true)
+
     public ProductEntity getActiveEntity(UUID id) {
         return products.findById(id).filter(ProductEntity::isActive)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Produto não encontrado."));
     }
+
     private ProductEntity getProduct(UUID id) {
         return products.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Produto não encontrado."));
     }
+
     private void normalize(ProductEntity product) {
         product.setTitle(product.getTitle().trim()); product.setDescription(product.getDescription().trim());
         product.setDepartment(product.getDepartment().trim()); product.setImage(product.getImage().trim());
@@ -53,6 +99,7 @@ public class ProductService {
         product.setWoodTypes(normalizeOptions(product.getWoodTypes()));
         product.setUpholsteryColors(normalizeOptions(product.getUpholsteryColors()));
     }
+
     private List<String> normalizeOptions(List<String> options) {
         if (options == null) return List.of();
         List<String> normalized = new ArrayList<>();

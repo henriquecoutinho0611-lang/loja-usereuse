@@ -38,7 +38,7 @@ Pré-requisitos: Node.js 22.22+ (ou 26), Java 25 e PostgreSQL instalado.
    & "C:\Program Files\nodejs\npm.cmd" start
    ```
 
-   O Vite/React usa `https://localhost:8443/api` durante o desenvolvimento. Se o Node estiver instalado em outro local, ajuste o caminho de `nodejs`.
+   O Vite encaminha `/api` e `/media/products` ao Spring em `https://localhost:8443`. A chamada passa pelo servidor de desenvolvimento, então o navegador não precisa acessar diretamente o certificado HTTPS local do backend. Se o backend estiver em outro endereço, configure `VITE_API_PROXY_TARGET` no `.env` do `font-end` e reinicie o Vite. Se o Node estiver instalado em outro local, ajuste o caminho de `nodejs`.
 
 ## Compilar React para o Spring
 
@@ -50,6 +50,8 @@ $env:Path = "C:\Program Files\nodejs;" + $env:Path
 ```
 
 O comando gera o React diretamente em `Back-end/src/main/resources/static`. Em seguida, inicie/reinicie o Spring e abra `https://localhost:8443`. Não é necessário rodar o servidor de desenvolvimento Vite para usar o build incorporado.
+
+No build incorporado, a API e as imagens usam caminhos relativos (`/api` e `/media/products`) e são servidas pela mesma origem HTTPS do Spring. Para hospedar o front-end separadamente, configure `VITE_API_BASE_URL` com a URL da API e `VITE_API_ORIGIN` com a origem das imagens antes do build.
 
 ## Catálogo de demonstração e compras
 

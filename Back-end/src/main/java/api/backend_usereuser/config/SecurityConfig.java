@@ -66,11 +66,11 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsSource))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/", "/index.html", "/assets/**", "/*.js", "/*.css", "/3rdpartylicenses.txt", "/media/products/**", "/favicon.ico", "/api/auth/**", "/api/admin/auth/login", "/api/products/**", "/api/banners", "/api/store-settings", "/api/shipping/quote", "/api/health", "/error").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("CUSTOMER")
-                        .requestMatchers(HttpMethod.POST, "/api/orders/*/payment-intent").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasAnyRole("CUSTOMER", "MERCHANT")
                         .requestMatchers("/api/admin/**").hasRole("MERCHANT")
-                        .requestMatchers("/api/account/**").hasRole("CUSTOMER")
+                        .requestMatchers("/api/account/**").hasAnyRole("CUSTOMER", "MERCHANT")
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)));
         return http.build();
@@ -82,7 +82,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(Arrays.stream(origins.split(",")).map(String::trim).filter(s -> !s.isBlank()).toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Idempotency-Key"));
-        config.setExposedHeaders(List.of("Location", "Idempotency-Replayed"));
+        config.setExposedHeaders(List.of("Location"));
         config.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);

@@ -36,4 +36,12 @@ public class ApiExceptionHandler {
     ResponseEntity<Map<String, String>> handleConflict(DataIntegrityViolationException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", "Este cadastro ou chave de compra já existe."));
     }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<Map<String, String>> handleGeneral(Exception ex) {
+        String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "Ocorreu um erro ao processar a solicitação no servidor.";
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", msg));
+    }
 }

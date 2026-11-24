@@ -98,12 +98,6 @@ export interface StoreSettings {
   paymentMessage: string;
 }
 
-export interface PaymentIntentResponse {
-  provider: string;
-  providerReference: string;
-  checkoutUrl: string;
-}
-
 export interface OrderRequest {
   customer: { name: string; email: string; phone: string } | null;
   zipCode: string;

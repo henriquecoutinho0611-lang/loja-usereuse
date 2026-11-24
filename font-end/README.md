@@ -4,7 +4,7 @@ O front-end usa React, TypeScript e Vite. A loja obtém os produtos pelo backend
 
 ## Desenvolvimento
 
-Requer Node.js 22.22+ (ou 26). Inicie o Spring e o PostgreSQL primeiro; o React de desenvolvimento consome `https://localhost:8443/api`.
+Requer Node.js 22.22+ (ou 26). Inicie o Spring e o PostgreSQL primeiro. O Vite encaminha as solicitações de `/api` e `/media/products` para `https://localhost:8443`, evitando chamadas diretas do navegador ao certificado local do backend.
 
 ```powershell
 $env:Path = "C:\Program Files\nodejs;" + $env:Path
@@ -22,7 +22,9 @@ O Vite publica os arquivos compilados em `../Back-end/src/main/resources/static`
 
 ## Configuração local
 
-- API de desenvolvimento: `VITE_API_BASE_URL` e `VITE_API_ORIGIN` (padrão `https://localhost:8443/api`).
+- Backend para o proxy local do Vite: `VITE_API_PROXY_TARGET` (padrão `https://localhost:8443`). Reinicie o Vite depois de alterar essa variável.
+- URL da API: `VITE_API_BASE_URL` (padrão `/api`, para usar o proxy do Vite ou a mesma origem no build integrado).
+- Origem das imagens: `VITE_API_ORIGIN` (vazia por padrão; caminhos relativos usam a origem atual e, em desenvolvimento, o proxy do Vite).
 - API no build integrado: `/api`, servida pela mesma origem.
 - WhatsApp: configure `VITE_WHATSAPP_NUMBER` em um arquivo `.env`. Use país e DDD, somente dígitos.
 - Credenciais do lojista: somente `Back-end/.env`; nunca colocar senha ou CPF em variáveis `VITE_` ou no frontend.

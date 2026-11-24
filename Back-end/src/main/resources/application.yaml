@@ -53,12 +53,3 @@ app:
     enabled: ${APP_DEMO_DATA_ENABLED:false}
   images:
     local-directory: ${IMAGE_STORAGE_DIR:./uploads/products}
-  shipping:
-    sao-paulo-capital-price: ${SHIPPING_SAO_PAULO_CAPITAL_PRICE:}
-    sao-paulo-state-price: ${SHIPPING_SAO_PAULO_STATE_PRICE:}
-  payments:
-    itau:
-      enabled: ${ITAU_PAYMENT_ENABLED:false}
-      base-url: ${ITAU_API_BASE_URL:}
-      client-id: ${ITAU_CLIENT_ID:}
-      client-secret: ${ITAU_CLIENT_SECRET:}

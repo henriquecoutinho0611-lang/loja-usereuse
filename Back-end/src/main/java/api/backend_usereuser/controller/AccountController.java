@@ -9,6 +9,7 @@ import api.backend_usereuser.mapper.UserMapper;
 import api.backend_usereuser.repository.OrderRepository;
 import api.backend_usereuser.repository.UserRepository;
 import api.backend_usereuser.service.OrderService;
+import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,21 +26,13 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/account")
+@AllArgsConstructor
 public class AccountController {
     private final UserRepository users;
     private final UserMapper userMapper;
     private final OrderService orders;
     private final OrderRepository ordersRepository;
     private final PasswordEncoder passwordEncoder;
-
-    public AccountController(UserRepository users, UserMapper userMapper, OrderService orders,
-                             OrderRepository ordersRepository, PasswordEncoder passwordEncoder) {
-        this.users = users;
-        this.userMapper = userMapper;
-        this.orders = orders;
-        this.ordersRepository = ordersRepository;
-        this.passwordEncoder = passwordEncoder;
-    }
 
     @GetMapping("/profile")
     @Transactional(readOnly = true)
@@ -50,7 +43,7 @@ public class AccountController {
     @GetMapping("/orders")
     @Transactional(readOnly = true)
     public List<OrderResponse> orders(@AuthenticationPrincipal Jwt jwt) {
-        return orders.listForCustomer(customer(jwt));
+        return orders.listForCustomer(jwt.getSubject());
     }
 
     @DeleteMapping
@@ -70,7 +63,7 @@ public class AccountController {
 
     private UserEntity customer(Jwt jwt) {
         return users.findByEmailIgnoreCase(jwt.getSubject())
-                .filter(user -> user.getRole() == Role.CUSTOMER && user.isActive())
-                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "Esta área é exclusiva para clientes."));
+                .filter(UserEntity::isActive)
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "Conta não encontrada ou inativa."));
     }
 }

@@ -25,19 +25,29 @@ public class ProductController {
     public ProductController(ProductService products) { this.products = products; }
 
     @GetMapping("/products")
-    public List<ProductResponse> publicProducts() { return products.listPublic(); }
+    public List<ProductResponse> publicProducts() {
+
+        return products.listPublic(); }
 
     @GetMapping("/admin/products")
-    public List<ProductResponse> merchantProducts() { return products.listForMerchant(); }
+    public List<ProductResponse> merchantProducts() {
+
+        return products.listForMerchant(); }
 
     @PostMapping("/admin/products")
     @ResponseStatus(HttpStatus.CREATED)
-    public ProductResponse create(@Valid @RequestBody ProductRequest request) { return products.create(request); }
+    public ProductResponse create(@Valid @RequestBody ProductRequest request) {
+
+        return products.create(request); }
 
     @PutMapping("/admin/products/{id}")
-    public ProductResponse update(@PathVariable UUID id, @Valid @RequestBody ProductRequest request) { return products.update(id, request); }
+    public ProductResponse update(@PathVariable UUID id, @Valid @RequestBody ProductRequest request) {
+
+        return products.update(id, request); }
 
     @DeleteMapping("/admin/products/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID id) { products.delete(id); }
+    public void delete(@PathVariable UUID id) {
+
+        products.delete(id); }
 }
