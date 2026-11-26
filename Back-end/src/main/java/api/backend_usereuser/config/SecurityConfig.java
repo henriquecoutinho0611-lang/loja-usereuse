@@ -30,7 +30,7 @@ import java.util.List;
 @Configuration
 public class SecurityConfig {
     @Bean
-    SecretKey jwtSecretKey(@Value("${app.jwt.secret}") String secret) {
+    SecretKey jwtSecretKey(@Value("${app.jwt.secret:local-only-change-this-secret-before-production-32chars}") String secret) {
         byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
         if (bytes.length < 32) throw new IllegalStateException("JWT_SECRET precisa ter pelo menos 32 bytes.");
         return new SecretKeySpec(bytes, "HmacSHA256");
@@ -77,7 +77,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}") String origins) {
+    CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:4200}") String origins) {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(Arrays.stream(origins.split(",")).map(String::trim).filter(s -> !s.isBlank()).toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

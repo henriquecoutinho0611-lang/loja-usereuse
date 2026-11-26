@@ -1,32 +1,30 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import type { Product, ProductSelection } from "./app/models";
-import { formatBrazilianDateInput, formatBrazilianZipCode, formatDateForInput } from "./app/form-formatters";
-import { AppRoutes } from "./routes/AppRoutes";
+import { formatBrazilianZipCode, formatDateForInput, formatBrazilianDateInput } from "./app/form-formatters";
 import type { StoreScreen } from "./routes/types";
 import { useAuth } from "./hooks/useAuth";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { MainLayout } from "./layouts/MainLayout";
-import { CatalogPage } from "./features/catalog/pages/CatalogPage";
-import { DepartmentPage } from "./features/catalog/pages/DepartmentPage";
-import { ProductDetailPage } from "./features/catalog/pages/ProductDetailPage";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { Toast } from "./components/Toast";
-import { CartPage } from "./features/cart/pages/CartPage";
 import { useCart } from "./features/cart/CartContext";
-import { cartLineKey } from "./features/cart/cartTypes";
 import { EMPTY_SELECTION } from "./features/cart/cartUtils";
+import { cartLineKey } from "./features/cart/cartTypes";
+import { useCatalog, imageUrl, money } from "./features/catalog/useCatalog";
+import { useCustomerAccount } from "./features/auth/useCustomerAccount";
+import { useCheckout } from "./features/checkout/useCheckout";
+import { useMerchantAdmin, ORDER_STATUSES, statusLabel } from "./features/admin/useMerchantAdmin";
+import { CatalogPage } from "./features/catalog/pages/CatalogPage";
+import { DepartmentPage } from "./features/catalog/pages/DepartmentPage";
+import { ProductDetailPage } from "./features/catalog/pages/ProductDetailPage";
+import { CartPage } from "./features/cart/pages/CartPage";
 import { CheckoutPage } from "./features/checkout/pages/CheckoutPage";
 import { OrderSuccessPage, PaymentPage } from "./features/checkout/pages/PaymentPage";
 import { AccountPage } from "./features/auth/pages/AccountPage";
 import { RegisterPage } from "./features/auth/pages/RegisterPage";
 import { Dashboard } from "./features/admin/pages/Dashboard";
 import { MerchantLoginPage } from "./features/admin/pages/MerchantLoginPage";
-import { imageUrl, money, useCatalog } from "./features/catalog/useCatalog";
-import { useCustomerAccount } from "./features/auth/useCustomerAccount";
-import { useCheckout } from "./features/checkout/useCheckout";
-import { ORDER_STATUSES, statusLabel, useMerchantAdmin } from "./features/admin/useMerchantAdmin";
 
 function formatOrderDate(value: string): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
@@ -116,7 +114,6 @@ export default function App() {
     showNotice(`${product.title} foi adicionado à sacola.`);
   }
 
-  // Hook 1: Catalog domain
   const catalog = useCatalog({
     isHomeScreen: screen === "home",
     onCatalogSynced(catalogProducts) {
@@ -127,7 +124,6 @@ export default function App() {
     },
   });
 
-  // Hook 2: Customer Account & Orders domain
   const customer = useCustomerAccount({
     role,
     account,
@@ -156,7 +152,6 @@ export default function App() {
     },
   });
 
-  // Hook 3: Checkout domain
   const checkout = useCheckout({
     role,
     account,
@@ -174,7 +169,6 @@ export default function App() {
     },
   });
 
-  // Hook 4: Merchant / Admin domain
   const merchant = useMerchantAdmin({
     role,
     storeSettings: catalog.storeSettings,
@@ -192,7 +186,6 @@ export default function App() {
     },
   });
 
-  // Session expired event handler
   useEffect(() => {
     function handleExpiredSession(): void {
       const expiredRole = role;
@@ -244,240 +237,267 @@ export default function App() {
     setMobileMenuOpen(false);
   }
 
-  const pages: Partial<Record<StoreScreen, ReactNode>> = {
-    home: (
-      <CatalogPage
-        banners={catalog.banners}
-        bannerIndex={catalog.bannerIndex}
-        onBannerChange={catalog.setBannerIndex}
-        onScrollToCatalog={scrollToCatalog}
-        showroomProducts={catalog.showroomProducts}
-        activeShowroomIndex={catalog.activeShowroomIndex}
-        onShowroomChange={catalog.setActiveShowroomIndex}
-        showroomProduct={catalog.showroomProduct}
-        imageUrl={imageUrl}
-        onSelectProduct={selectProduct}
-        search={catalog.search}
-        departments={catalog.departments}
-        materials={catalog.materials}
-        selectedDepartment={catalog.selectedDepartment}
-        filters={catalog.productFilters}
-        onDepartmentChange={chooseDepartment}
-        onFilterChange={(field, value) => catalog.setProductFilters((current) => ({ ...current, [field]: value }))}
-        onClearFilters={() => {
-          catalog.clearFilters();
-          if (screen === "department") setScreen("home");
-        }}
-        visibleProducts={catalog.visibleProducts}
-        productCount={catalog.products.length}
-        productLoading={catalog.productLoading}
-        productError={catalog.productError}
-        onRetryCatalog={catalog.retryCatalog}
-        onWishlist={() => showNotice("Favorito salvo nesta sessão.")}
-        onSubscribe={() => showNotice("Cadastro recebido! Em breve você terá novidades.")}
-      />
-    ),
-    department: (
-      <DepartmentPage
-        department={catalog.selectedDepartment}
-        departments={catalog.departments}
-        materials={catalog.materials}
-        filters={catalog.productFilters}
-        products={catalog.departmentProducts}
-        highlightedProduct={catalog.highlightedProduct}
-        imageUrl={imageUrl}
-        featuredOnly={catalog.featuredOnly}
-        sortOrder={catalog.sortOrder}
-        onFilterChange={(field, value) => catalog.setProductFilters((current) => ({ ...current, [field]: value }))}
-        onDepartmentChange={chooseDepartment}
-        onClearFilters={() => {
-          catalog.clearFilters();
-          setScreen("home");
-        }}
-        onFeaturedChange={() => catalog.setFeaturedOnly((current) => !current)}
-        onSortChange={catalog.setSortOrder}
-        onSelectProduct={selectProduct}
-        onBack={goHome}
-      />
-    ),
-    product: activeProduct ? (
-      <ProductDetailPage
-        product={activeProduct}
-        relatedProducts={catalog.products.filter((p) => p.id !== activeProduct.id && p.department === activeProduct.department)}
-        selection={checkout.selectedOptions}
-        shippingZip={checkout.shippingZip}
-        shippingResult={checkout.shippingResult}
-        shippingBusy={checkout.shippingBusy}
-        imageUrl={imageUrl}
-        money={money}
-        onBack={backToCatalog}
-        onSelectionChange={(field, value) => checkout.setSelectedOptions((current) => ({ ...current, [field]: value }))}
-        onAddToCart={() => addToCart(activeProduct, checkout.selectedOptions)}
-        onCheckout={() => checkout.openCheckout(activeProduct)}
-        onShippingZipChange={(value) => {
-          checkout.setShippingZip(formatBrazilianZipCode(value));
-          checkout.setShippingResult(null);
-        }}
-        onCalculateShipping={(event) => void checkout.calculateShipping(event, activeProduct)}
-        onSelectRelated={selectProduct}
-      />
-    ) : null,
-    cart: (
-      <CartPage
-        items={cartItems}
-        itemCount={cartCount}
-        total={cartTotal}
-        imageUrl={imageUrl}
-        money={money}
-        itemKey={cartLineKey}
-        onHome={goHome}
-        onSelectProduct={(line) => selectProduct(line.product, line.selection)}
-        onQuantityChange={setCartQuantity}
-        onRemove={removeCartItem}
-        onCheckout={checkout.beginCartCheckout}
-      />
-    ),
-    checkout: checkout.checkoutProduct ? (
-      <CheckoutPage
-        product={checkout.checkoutProduct}
-        fromCart={checkout.checkoutFromCart}
-        cartItems={cartItems}
-        account={role === "customer" ? account : null}
-        orderForm={checkout.orderForm}
-        selection={checkout.checkoutSelection}
-        shipping={checkout.checkoutShipping}
-        shippingBusy={checkout.checkoutShippingBusy}
-        submitting={checkout.checkoutBusy}
-        optionsValid={checkout.checkoutOptionsValid}
-        total={checkout.checkoutTotal}
-        storeSettings={catalog.storeSettings}
-        itemKey={cartLineKey}
-        imageUrl={imageUrl}
-        money={money}
-        onBack={() => {
-          if (checkout.checkoutFromCart) {
-            goToScreen("cart");
-            return;
-          }
-          selectProduct(checkout.checkoutProduct!, checkout.checkoutSelection);
-        }}
-        onGoToAccount={() => goToScreen("account")}
-        onSubmit={(event) => void checkout.submitOrder(event)}
-        onZipCodeChange={(value) => {
-          checkout.updateOrderField("zipCode", formatBrazilianZipCode(value));
-          checkout.setCheckoutShipping(null);
-        }}
-        onAddressChange={(value) => checkout.updateOrderField("address", value)}
-        onQuantityChange={(value) => checkout.updateOrderField("quantity", value)}
-        onSelectionChange={(field, value) => {
-          checkout.setCheckoutSelection((current) => ({ ...current, [field]: value }));
-          checkout.setSelectedOptions((current) => ({ ...current, [field]: value }));
-        }}
-        onCartSelectionChange={(line, field, value) => updateCartLineSelection(cartLineKey(line), field, value)}
-        onCalculateShipping={() => void checkout.calculateCheckoutShipping()}
-      />
-    ) : null,
-    payment: customer.lastOrder ? (
-      <PaymentPage
-        order={customer.lastOrder}
-        storeSettings={catalog.storeSettings}
-        money={money}
-        onContinue={() => setScreen("success")}
-        onViewOrders={showAccount}
-      />
-    ) : null,
-    success: (
-      <OrderSuccessPage
-        order={customer.lastOrder}
-        statusLabel={statusLabel}
-        onViewOrders={showAccount}
-        onHome={goHome}
-      />
-    ),
-    account: (
-      <AccountPage
-        account={role === "customer" ? account : null}
-        orders={customer.orders}
-        loadingOrders={customer.loadingOrders}
-        login={customer.customerLogin}
-        loginError={customer.customerLoginError}
-        loginBusy={customer.loginBusy}
-        deleteBusy={customer.deleteAccountBusy}
-        money={money}
-        formatOrderDate={formatOrderDate}
-        formatDeliveryDate={formatDeliveryDate}
-        statusLabel={statusLabel}
-        onHome={goHome}
-        onLogout={() => void logout()}
-        onRefreshOrders={() => void customer.loadOrders()}
-        onLogin={(event) => void customer.loginCustomer(event)}
-        onLoginChange={(field, value) => customer.setCustomerLogin((current) => ({ ...current, [field]: value }))}
-        onRegister={() => goToScreen("register")}
-        onDeleteAccount={() => void customer.deleteCustomerAccount()}
-      />
-    ),
-    register: (
-      <RegisterPage
-        form={customer.registerForm}
-        error={customer.registerError}
-        busy={customer.registerBusy}
-        onBack={() => goToScreen("account")}
-        onSubmit={(event) => void customer.registerCustomer(event)}
-        onChange={(field, value) => customer.setRegisterForm((current) => ({ ...current, [field]: value }))}
-      />
-    ),
-    admin: role === "merchant" ? (
-      <Dashboard
-        account={account}
-        products={merchant.adminProducts}
-        productForm={merchant.productForm}
-        numericDrafts={merchant.productNumericDrafts}
-        optionDrafts={merchant.productOptionDrafts}
-        editingProduct={merchant.editingProduct}
-        mainImagePreview={merchant.mainImagePreview}
-        ambientImagePreview={merchant.ambientImagePreview}
-        productBusy={merchant.adminBusy}
-        orders={merchant.adminOrders}
-        loadingOrders={merchant.loadingAdminOrders}
-        deliveryDateBusy={merchant.deliveryDateBusy}
-        deliveryDateDrafts={merchant.deliveryDateDrafts}
-        orderStatuses={ORDER_STATUSES}
-        settings={merchant.storeSettingsDraft}
-        settingsBusy={merchant.storeSettingsBusy}
-        imageUrl={imageUrl}
-        money={money}
-        formatOrderDate={formatOrderDate}
-        formatDateForInput={formatDateForInput}
-        formatBrazilianDateInput={formatBrazilianDateInput}
-        onBack={goHome}
-        onLogout={() => void logout()}
-        onProductSubmit={(event) => void merchant.saveProduct(event)}
-        onCancelEdit={merchant.cancelEdit}
-        onProductFieldChange={merchant.updateProductField}
-        onNumericDraftChange={(field, value) => merchant.setProductNumericDrafts((current) => ({ ...current, [field]: value }))}
-        onOptionDraftChange={(field, value) => merchant.setProductOptionDrafts((current) => ({ ...current, [field]: value }))}
-        onChooseImage={merchant.chooseImage}
-        onBeginEdit={merchant.beginEdit}
-        onDeleteProduct={(product) => void merchant.deleteProduct(product)}
-        onRefreshOrders={() => void merchant.loadAdminOrders()}
-        onOrderStatusChange={(order, status) => void merchant.updateOrderStatus(order, status)}
-        onDeliveryDateDraftChange={(orderId, value) => merchant.setDeliveryDateDrafts((current) => ({ ...current, [orderId]: value }))}
-        onSaveDeliveryDate={merchant.saveDeliveryDate}
-        onRemoveDeliveryDate={(order) => void merchant.updateDeliveryDate(order, null)}
-        onSettingsSubmit={(event) => void merchant.saveStoreSettings(event)}
-        onSettingsChange={merchant.updateStoreSettingsField}
-      />
-    ) : (
-      <MerchantLoginPage
-        form={merchant.merchantLogin}
-        error={merchant.merchantLoginError}
-        busy={merchant.loginBusy}
-        onBack={goHome}
-        onSubmit={(event) => void merchant.loginMerchant(event)}
-        onChange={(field, value) => merchant.setMerchantLogin((current) => ({ ...current, [field]: value }))}
-      />
-    ),
-  };
+  // ── page rendering (replaces StorePages + AppRoutes) ───────────────
+  function renderPage() {
+    switch (screen) {
+      case "home":
+        return (
+          <CatalogPage
+            banners={catalog.banners}
+            bannerIndex={catalog.bannerIndex}
+            onBannerChange={catalog.setBannerIndex}
+            onScrollToCatalog={scrollToCatalog}
+            showroomProducts={catalog.showroomProducts}
+            activeShowroomIndex={catalog.activeShowroomIndex}
+            onShowroomChange={catalog.setActiveShowroomIndex}
+            showroomProduct={catalog.showroomProduct}
+            imageUrl={imageUrl}
+            onSelectProduct={selectProduct}
+            search={catalog.search}
+            departments={catalog.departments}
+            materials={catalog.materials}
+            selectedDepartment={catalog.selectedDepartment}
+            filters={catalog.productFilters}
+            onDepartmentChange={chooseDepartment}
+            onFilterChange={(field, value) => catalog.setProductFilters((current) => ({ ...current, [field]: value }))}
+            onClearFilters={() => {
+              catalog.clearFilters();
+              if (screen === "department") goToScreen("home");
+            }}
+            visibleProducts={catalog.visibleProducts}
+            productCount={catalog.products.length}
+            productLoading={catalog.productLoading}
+            productError={catalog.productError}
+            onRetryCatalog={catalog.retryCatalog}
+            onWishlist={() => showNotice("Favorito salvo nesta sessão.")}
+            onSubscribe={() => showNotice("Cadastro recebido! Em breve você terá novidades.")}
+          />
+        );
+
+      case "department":
+        return (
+          <DepartmentPage
+            department={catalog.selectedDepartment}
+            departments={catalog.departments}
+            materials={catalog.materials}
+            filters={catalog.productFilters}
+            products={catalog.departmentProducts}
+            highlightedProduct={catalog.highlightedProduct}
+            imageUrl={imageUrl}
+            featuredOnly={catalog.featuredOnly}
+            sortOrder={catalog.sortOrder}
+            onFilterChange={(field, value) => catalog.setProductFilters((current) => ({ ...current, [field]: value }))}
+            onDepartmentChange={chooseDepartment}
+            onClearFilters={() => {
+              catalog.clearFilters();
+              goHome();
+            }}
+            onFeaturedChange={() => catalog.setFeaturedOnly((current) => !current)}
+            onSortChange={catalog.setSortOrder}
+            onSelectProduct={selectProduct}
+            onBack={goHome}
+          />
+        );
+
+      case "product":
+        return activeProduct ? (
+          <ProductDetailPage
+            product={activeProduct}
+            relatedProducts={catalog.products.filter(
+              (p) => p.id !== activeProduct.id && p.department === activeProduct.department
+            )}
+            selection={checkout.selectedOptions}
+            shippingZip={checkout.shippingZip}
+            shippingResult={checkout.shippingResult}
+            shippingBusy={checkout.shippingBusy}
+            imageUrl={imageUrl}
+            money={money}
+            onBack={backToCatalog}
+            onSelectionChange={(field, value) => checkout.setSelectedOptions((current) => ({ ...current, [field]: value }))}
+            onAddToCart={() => addToCart(activeProduct, checkout.selectedOptions)}
+            onCheckout={() => checkout.openCheckout(activeProduct)}
+            onShippingZipChange={(value) => {
+              checkout.setShippingZip(formatBrazilianZipCode(value));
+              checkout.setShippingResult(null);
+            }}
+            onCalculateShipping={(event) => void checkout.calculateShipping(event, activeProduct)}
+            onSelectRelated={selectProduct}
+          />
+        ) : null;
+
+      case "cart":
+        return (
+          <CartPage
+            items={cartItems}
+            itemCount={cartCount}
+            total={cartTotal}
+            imageUrl={imageUrl}
+            money={money}
+            itemKey={cartLineKey}
+            onHome={goHome}
+            onSelectProduct={(line) => selectProduct(line.product, line.selection)}
+            onQuantityChange={setCartQuantity}
+            onRemove={removeCartItem}
+            onCheckout={checkout.beginCartCheckout}
+          />
+        );
+
+      case "checkout":
+        return checkout.checkoutProduct ? (
+          <CheckoutPage
+            product={checkout.checkoutProduct}
+            fromCart={checkout.checkoutFromCart}
+            cartItems={cartItems}
+            account={role === "customer" ? account : null}
+            orderForm={checkout.orderForm}
+            selection={checkout.checkoutSelection}
+            shipping={checkout.checkoutShipping}
+            shippingBusy={checkout.checkoutShippingBusy}
+            submitting={checkout.checkoutBusy}
+            optionsValid={checkout.checkoutOptionsValid}
+            total={checkout.checkoutTotal}
+            storeSettings={catalog.storeSettings}
+            itemKey={cartLineKey}
+            imageUrl={imageUrl}
+            money={money}
+            onBack={() => {
+              if (checkout.checkoutFromCart) {
+                goToScreen("cart");
+                return;
+              }
+              selectProduct(checkout.checkoutProduct!, checkout.checkoutSelection);
+            }}
+            onGoToAccount={() => goToScreen("account")}
+            onSubmit={(event) => void checkout.submitOrder(event)}
+            onZipCodeChange={(value) => {
+              checkout.updateOrderField("zipCode", formatBrazilianZipCode(value));
+              checkout.setCheckoutShipping(null);
+            }}
+            onAddressChange={(value) => checkout.updateOrderField("address", value)}
+            onQuantityChange={(value) => checkout.updateOrderField("quantity", value)}
+            onSelectionChange={(field, value) => {
+              checkout.setCheckoutSelection((current) => ({ ...current, [field]: value }));
+              checkout.setSelectedOptions((current) => ({ ...current, [field]: value }));
+            }}
+            onCartSelectionChange={(line, field, value) => updateCartLineSelection(cartLineKey(line), field, value)}
+            onCalculateShipping={() => void checkout.calculateCheckoutShipping()}
+          />
+        ) : null;
+
+      case "payment":
+        return customer.lastOrder ? (
+          <PaymentPage
+            order={customer.lastOrder}
+            storeSettings={catalog.storeSettings}
+            money={money}
+            onContinue={() => goToScreen("success")}
+            onViewOrders={showAccount}
+          />
+        ) : null;
+
+      case "success":
+        return (
+          <OrderSuccessPage
+            order={customer.lastOrder}
+            statusLabel={statusLabel}
+            onViewOrders={showAccount}
+            onHome={goHome}
+          />
+        );
+
+      case "account":
+        return (
+          <AccountPage
+            account={role === "customer" ? account : null}
+            orders={customer.orders}
+            loadingOrders={customer.loadingOrders}
+            login={customer.customerLogin}
+            loginError={customer.customerLoginError}
+            loginBusy={customer.loginBusy}
+            deleteBusy={customer.deleteAccountBusy}
+            money={money}
+            formatOrderDate={formatOrderDate}
+            formatDeliveryDate={formatDeliveryDate}
+            statusLabel={statusLabel}
+            onHome={goHome}
+            onLogout={() => void logout()}
+            onRefreshOrders={() => void customer.loadOrders()}
+            onLogin={(event) => void customer.loginCustomer(event)}
+            onLoginChange={(field, value) => customer.setCustomerLogin((current) => ({ ...current, [field]: value }))}
+            onRegister={() => goToScreen("register")}
+            onDeleteAccount={() => void customer.deleteCustomerAccount()}
+          />
+        );
+
+      case "register":
+        return (
+          <RegisterPage
+            form={customer.registerForm}
+            error={customer.registerError}
+            busy={customer.registerBusy}
+            onBack={() => goToScreen("account")}
+            onSubmit={(event) => void customer.registerCustomer(event)}
+            onChange={(field, value) => customer.setRegisterForm((current) => ({ ...current, [field]: value }))}
+          />
+        );
+
+      case "admin":
+        return role === "merchant" ? (
+          <Dashboard
+            account={account}
+            products={merchant.adminProducts}
+            productForm={merchant.productForm}
+            numericDrafts={merchant.productNumericDrafts}
+            optionDrafts={merchant.productOptionDrafts}
+            editingProduct={merchant.editingProduct}
+            mainImagePreview={merchant.mainImagePreview}
+            ambientImagePreview={merchant.ambientImagePreview}
+            productBusy={merchant.productSavingBusy}
+            orders={merchant.adminOrders}
+            loadingOrders={merchant.loadingAdminOrders}
+            deliveryDateBusy={merchant.deliveryDateBusy}
+            deliveryDateDrafts={merchant.deliveryDateDrafts}
+            orderStatuses={ORDER_STATUSES}
+            settings={merchant.storeSettingsDraft}
+            settingsBusy={merchant.storeSettingsBusy}
+            imageUrl={imageUrl}
+            money={money}
+            formatOrderDate={formatOrderDate}
+            formatDateForInput={formatDateForInput}
+            formatBrazilianDateInput={formatBrazilianDateInput}
+            onBack={goHome}
+            onLogout={() => void logout()}
+            onProductSubmit={(event) => void merchant.saveProduct(event)}
+            onCancelEdit={merchant.cancelEdit}
+            onProductFieldChange={merchant.updateProductField}
+            onNumericDraftChange={(field, value) => merchant.setProductNumericDrafts((current) => ({ ...current, [field]: value }))}
+            onOptionDraftChange={(field, value) => merchant.setProductOptionDrafts((current) => ({ ...current, [field]: value }))}
+            onChooseImage={merchant.chooseImage}
+            onBeginEdit={merchant.beginEdit}
+            onDeleteProduct={(product) => void merchant.deleteProduct(product)}
+            onRefreshOrders={() => void merchant.loadAdminOrders()}
+            onOrderStatusChange={(order, status) => void merchant.updateOrderStatus(order, status)}
+            onDeliveryDateDraftChange={(orderId, value) => merchant.setDeliveryDateDrafts((current) => ({ ...current, [orderId]: value }))}
+            onSaveDeliveryDate={merchant.saveDeliveryDate}
+            onRemoveDeliveryDate={(order) => void merchant.updateDeliveryDate(order, null)}
+            onSettingsSubmit={(event) => void merchant.saveStoreSettings(event)}
+            onSettingsChange={merchant.updateStoreSettingsField}
+          />
+        ) : (
+          <MerchantLoginPage
+            form={merchant.merchantLogin}
+            error={merchant.merchantLoginError}
+            busy={merchant.loginBusy}
+            onBack={goHome}
+            onSubmit={(event) => void merchant.loginMerchant(event)}
+            onChange={(field, value) => merchant.setMerchantLogin((current) => ({ ...current, [field]: value }))}
+          />
+        );
+
+      default:
+        return null;
+    }
+  }
 
   const ScreenLayout = role === "merchant" ? AdminLayout : MainLayout;
 
@@ -508,9 +528,7 @@ export default function App() {
           onMerchantSection={scrollToMerchantSection}
         />
 
-        <main>
-          <AppRoutes screen={screen} pages={pages} />
-        </main>
+        <main>{renderPage()}</main>
 
         <Footer
           isMerchant={role === "merchant"}

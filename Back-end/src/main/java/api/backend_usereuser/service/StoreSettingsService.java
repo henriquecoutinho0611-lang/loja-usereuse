@@ -1,10 +1,10 @@
 package api.backend_usereuser.service;
 
-import api.backend_usereuser.config.ShippingConfiguration;
 import api.backend_usereuser.dto.StoreSettingsRequest;
 import api.backend_usereuser.dto.StoreSettingsResponse;
 import api.backend_usereuser.entity.StoreSettingsEntity;
 import api.backend_usereuser.repository.StoreSettingsRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,11 +17,15 @@ public class StoreSettingsService {
     private static final String DEFAULT_PAYMENT_MESSAGE = "A loja combinará o pagamento após o envio do pedido.";
 
     private final StoreSettingsRepository settings;
-    private final ShippingConfiguration shippingConfiguration;
+    private final String defaultCapitalPrice;
+    private final String defaultStatePrice;
 
-    public StoreSettingsService(StoreSettingsRepository settings, ShippingConfiguration shippingConfiguration) {
+    public StoreSettingsService(StoreSettingsRepository settings,
+                                @Value("${app.shipping.sao-paulo-capital-price:}") String defaultCapitalPrice,
+                                @Value("${app.shipping.sao-paulo-state-price:}") String defaultStatePrice) {
         this.settings = settings;
-        this.shippingConfiguration = shippingConfiguration;
+        this.defaultCapitalPrice = defaultCapitalPrice;
+        this.defaultStatePrice = defaultStatePrice;
     }
 
     @Transactional(readOnly = true)
@@ -42,8 +46,8 @@ public class StoreSettingsService {
     }
 
     private StoreSettingsResponse defaults() {
-        return new StoreSettingsResponse("", parseDefaultPrice(shippingConfiguration.getSaoPauloCapitalPrice()),
-                parseDefaultPrice(shippingConfiguration.getSaoPauloStatePrice()), DEFAULT_DELIVERY_MESSAGE, DEFAULT_PAYMENT_MESSAGE);
+        return new StoreSettingsResponse("", parseDefaultPrice(defaultCapitalPrice),
+                parseDefaultPrice(defaultStatePrice), DEFAULT_DELIVERY_MESSAGE, DEFAULT_PAYMENT_MESSAGE);
     }
 
     private BigDecimal parseDefaultPrice(String value) {

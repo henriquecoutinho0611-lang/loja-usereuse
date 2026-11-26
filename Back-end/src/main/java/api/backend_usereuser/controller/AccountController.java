@@ -5,7 +5,6 @@ import api.backend_usereuser.dto.UserSummary;
 import api.backend_usereuser.entity.Role;
 import api.backend_usereuser.entity.UserEntity;
 import api.backend_usereuser.exception.ApiException;
-import api.backend_usereuser.mapper.UserMapper;
 import api.backend_usereuser.repository.OrderRepository;
 import api.backend_usereuser.repository.UserRepository;
 import api.backend_usereuser.service.OrderService;
@@ -29,7 +28,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class AccountController {
     private final UserRepository users;
-    private final UserMapper userMapper;
     private final OrderService orders;
     private final OrderRepository ordersRepository;
     private final PasswordEncoder passwordEncoder;
@@ -37,7 +35,7 @@ public class AccountController {
     @GetMapping("/profile")
     @Transactional(readOnly = true)
     public UserSummary profile(@AuthenticationPrincipal Jwt jwt) {
-        return userMapper.toSummary(customer(jwt));
+        return UserSummary.from(customer(jwt));
     }
 
     @GetMapping("/orders")

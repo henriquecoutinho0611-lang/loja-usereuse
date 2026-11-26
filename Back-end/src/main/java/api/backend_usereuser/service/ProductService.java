@@ -4,7 +4,6 @@ import api.backend_usereuser.dto.ProductRequest;
 import api.backend_usereuser.dto.ProductResponse;
 import api.backend_usereuser.entity.ProductEntity;
 import api.backend_usereuser.exception.ApiException;
-import api.backend_usereuser.mapper.ProductMapper;
 import api.backend_usereuser.repository.ProductRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -13,40 +12,39 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class ProductService {
     private final ProductRepository products;
-    private final ProductMapper mapper;
-    public ProductService(ProductRepository products, ProductMapper mapper) {
+
+    public ProductService(ProductRepository products) {
         this.products = products;
-        this.mapper = mapper; }
+    }
 
     @Transactional(readOnly = true)
     public List<ProductResponse> listPublic() {
-
-        return products.findAllByActiveTrueOrderByFeaturedDescCreatedAtDesc().stream().map(mapper::toResponse).toList();
+        return products.findAllByActiveTrueOrderByFeaturedDescCreatedAtDesc().stream()
+                .map(ProductResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
     public List<ProductResponse> listForMerchant() {
-
-        return products.findAllByOrderByCreatedAtDesc().stream().map(mapper::toResponse).toList();
+        return products.findAllByOrderByCreatedAtDesc().stream()
+                .map(ProductResponse::from).toList();
     }
 
     @Transactional
     public ProductResponse create(ProductRequest request) {
-        ProductEntity product = mapper.toEntity(request); normalize(product);
-        return mapper.toResponse(products.save(product));
-
+        ProductEntity product = request.toEntity();
+        normalize(product);
+        return ProductResponse.from(products.save(product));
     }
 
     @Transactional
     public ProductResponse update(UUID id, ProductRequest request) {
-
-        ProductEntity product = products.findById(id).orElseThrow(() -> new EntityNotFoundException("Product not found"+ id));
+        ProductEntity product = products.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id));
 
         product.setTitle(request.title());
         product.setDescription(request.description());
@@ -54,6 +52,8 @@ public class ProductService {
         product.setFeatured(request.featured());
         product.setDepartment(request.department());
         product.setOldPrice(request.oldPrice());
+        product.setWidth(request.width());
+        product.setHeight(request.height());
         product.setImage(request.image());
         product.setAmbientImage(request.ambientImage());
         product.setIronColors(request.ironColors());
@@ -61,38 +61,29 @@ public class ProductService {
         product.setWoodTypes(request.woodTypes());
         product.setUpholsteryColors(request.upholsteryColors());
 
-        return mapper.toResponse(products.save(product));
-
-
+        normalize(product);
+        return ProductResponse.from(products.save(product));
     }
 
     @Transactional
     public void delete(UUID id) {
-
-         if(!products.existsById(id)) {
-             throw new ApiException(HttpStatus.NOT_FOUND, "Product not found");
-
-         }
-         products.deleteById(id);
-
+        if (!products.existsById(id)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        products.deleteById(id);
     }
 
-
-
     @Transactional(readOnly = true)
-
     public ProductEntity getActiveEntity(UUID id) {
         return products.findById(id).filter(ProductEntity::isActive)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Produto não encontrado."));
     }
 
-    private ProductEntity getProduct(UUID id) {
-        return products.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Produto não encontrado."));
-    }
-
     private void normalize(ProductEntity product) {
-        product.setTitle(product.getTitle().trim()); product.setDescription(product.getDescription().trim());
-        product.setDepartment(product.getDepartment().trim()); product.setImage(product.getImage().trim());
+        product.setTitle(product.getTitle().trim());
+        product.setDescription(product.getDescription().trim());
+        product.setDepartment(product.getDepartment().trim());
+        product.setImage(product.getImage().trim());
         if (product.getAmbientImage() != null) product.setAmbientImage(product.getAmbientImage().trim());
         product.setIronColors(normalizeOptions(product.getIronColors()));
         product.setWoodColors(normalizeOptions(product.getWoodColors()));
@@ -102,13 +93,15 @@ public class ProductService {
 
     private List<String> normalizeOptions(List<String> options) {
         if (options == null) return List.of();
-        List<String> normalized = new ArrayList<>();
+        List<String> result = new ArrayList<>();
         for (String option : options) {
-            String value = option.trim();
-            if (!value.isBlank() && normalized.stream().noneMatch(existing -> existing.toLowerCase(Locale.ROOT).equals(value.toLowerCase(Locale.ROOT)))) {
-                normalized.add(value);
+            if (option == null) continue;
+            String trimmed = option.trim();
+            if (trimmed.isEmpty()) continue;
+            if (result.stream().noneMatch(existing -> existing.equalsIgnoreCase(trimmed))) {
+                result.add(trimmed);
             }
         }
-        return List.copyOf(normalized);
+        return result;
     }
 }

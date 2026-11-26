@@ -45,8 +45,14 @@ export function ProductsPage({
 }: ProductsPageProps) {
   return (
     <>
-      <form id="merchant-products" className="form-card product-admin-form" onSubmit={onSubmit}>
-        <div className="admin-form-heading">
+      <form
+          id="merchant-products"
+          className="form-card product-admin-form"
+          onSubmit={onSubmit}
+          noValidate
+      >
+
+      <div className="admin-form-heading">
           <h2>{editingProduct ? "Editar produto" : "Adicionar produto"}</h2>
           {editingProduct ? <button type="button" className="text-link" onClick={onCancelEdit}>Cancelar edição</button> : null}
         </div>
@@ -56,15 +62,15 @@ export function ProductsPage({
           <label>Departamento<input value={form.department} onChange={(event) => onProductFieldChange("department", event.currentTarget.value)} required maxLength={80} placeholder="Ex.: Estantes" /></label>
           <label>Preço atual (R$)<input value={numericDrafts.price} onChange={(event) => onNumericDraftChange("price", event.currentTarget.value)} type="number" min="0.01" step="0.01" required /></label>
           <label>Preço anterior (R$)<input value={numericDrafts.oldPrice} onChange={(event) => onNumericDraftChange("oldPrice", event.currentTarget.value)} type="number" min="0" step="0.01" placeholder="Opcional" /></label>
-          <label>Largura (cm)<input value={numericDrafts.width} onChange={(event) => onNumericDraftChange("width", event.currentTarget.value)} type="number" min="0.01" step="0.1" required /></label>
-          <label>Altura (cm)<input value={numericDrafts.height} onChange={(event) => onNumericDraftChange("height", event.currentTarget.value)} type="number" min="0.01" step="0.1" required /></label>
+          <label>Largura (cm)<input value={numericDrafts.width} onChange={(event) => onNumericDraftChange("width", event.currentTarget.value)} type="number" min="0.01" step="0.01" required /></label>
+          <label>Altura (cm)<input value={numericDrafts.height} onChange={(event) => onNumericDraftChange("height", event.currentTarget.value)} type="number" min="0.01" step="0.01" required /></label>
           <label>Opções de cor do ferro<textarea value={optionDrafts.ironColors} onChange={(event) => onOptionDraftChange("ironColors", event.currentTarget.value)} rows={2} placeholder="Preto, branco, dourado (opcional)" /><small>Digite uma opção por linha ou separe por vírgulas. Espaços dentro do nome são aceitos.</small></label>
           <label>Opções de cor da madeira<textarea value={optionDrafts.woodColors} onChange={(event) => onOptionDraftChange("woodColors", event.currentTarget.value)} rows={2} placeholder="Natural, nogueira (opcional)" /><small>Digite uma opção por linha ou separe por vírgulas. Espaços dentro do nome são aceitos.</small></label>
           <label>Tipos de madeira<textarea value={optionDrafts.woodTypes} onChange={(event) => onOptionDraftChange("woodTypes", event.currentTarget.value)} rows={2} placeholder="Pinus, eucalipto (opcional)" /><small>Digite uma opção por linha ou separe por vírgulas. Espaços dentro do nome são aceitos.</small></label>
           <label>Opções de cor do estofado<textarea value={optionDrafts.upholsteryColors} onChange={(event) => onOptionDraftChange("upholsteryColors", event.currentTarget.value)} rows={2} placeholder="Cinza, bege (opcional)" /><small>Digite uma opção por linha ou separe por vírgulas. Espaços dentro do nome são aceitos.</small></label>
           <label className="full-field image-upload-field">
             Imagem principal do produto
-            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => onChooseImage(event, "main")} required={!editingProduct} />
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => onChooseImage(event, "main")} />
             <small>JPG, PNG, WEBP ou GIF; até 10 MB.</small>
             {mainImagePreview ? <img className="upload-preview" src={mainImagePreview} alt="Prévia da imagem principal" /> : null}
           </label>
@@ -81,7 +87,7 @@ export function ProductsPage({
         </div>
         <div className="admin-form-bottom">
           <span>Os campos e as imagens serão atualizados na loja.</span>
-          <button className="button button-dark" disabled={busy}>
+          <button type="submit" className="button button-dark" disabled={busy}>
             {busy ? "Enviando..." : editingProduct ? "Salvar alterações" : "Publicar produto"} ✓
           </button>
         </div>

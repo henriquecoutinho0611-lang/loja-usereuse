@@ -2,13 +2,10 @@ package api.backend_usereuser.service;
 
 import api.backend_usereuser.dto.AuthResponse;
 import api.backend_usereuser.dto.CustomerRegisterRequest;
-import api.backend_usereuser.dto.LoginRequest;
-import api.backend_usereuser.dto.MerchantLoginRequest;
 import api.backend_usereuser.dto.UserSummary;
 import api.backend_usereuser.entity.Role;
 import api.backend_usereuser.entity.UserEntity;
 import api.backend_usereuser.exception.ApiException;
-import api.backend_usereuser.mapper.UserMapper;
 import api.backend_usereuser.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -16,6 +13,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
@@ -29,17 +27,18 @@ import java.util.Locale;
 @Service
 public class AuthService {
     private final UserRepository users;
-    private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtEncoder jwtEncoder;
     private final long tokenTtlSeconds;
 
-    public AuthService(UserRepository users, UserMapper userMapper, PasswordEncoder passwordEncoder,
-             AuthenticationManager authenticationManager, JwtEncoder jwtEncoder,
-            @Value("${app.jwt.ttl-seconds:3600}") long tokenTtlSeconds) {
-        this.users = users; this.userMapper = userMapper; this.passwordEncoder = passwordEncoder;
-        this.authenticationManager = authenticationManager; this.jwtEncoder = jwtEncoder;
+    public AuthService(UserRepository users, PasswordEncoder passwordEncoder,
+                       AuthenticationManager authenticationManager, JwtEncoder jwtEncoder,
+                       @Value("${app.jwt.ttl-seconds:3600}") long tokenTtlSeconds) {
+        this.users = users;
+        this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtEncoder = jwtEncoder;
         this.tokenTtlSeconds = tokenTtlSeconds;
     }
 
@@ -48,49 +47,53 @@ public class AuthService {
         String email = normalizeEmail(request.email());
         if (users.existsByEmailIgnoreCase(email)) throw new ApiException(HttpStatus.CONFLICT, "Já existe uma conta com este e-mail.");
         UserEntity user = new UserEntity();
-        user.setName(request.name().trim()); user.setEmail(email); user.setPhone(request.phone().trim());
-        user.setPasswordHash(passwordEncoder.encode(request.password())); user.setRole(Role.CUSTOMER);
-        return userMapper.toSummary(users.save(user));
+        user.setName(request.name().trim());
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setPhone(request.phone() == null ? "" : request.phone().trim());
+        user.setRole(Role.CUSTOMER);
+        return UserSummary.from(users.save(user));
     }
 
     @Transactional(readOnly = true)
-    public AuthResponse loginCustomer(LoginRequest request) {
-        UserEntity user = authenticate(request.email(), request.password());
-        if (user.getRole() != Role.CUSTOMER) throw new ApiException(HttpStatus.UNAUTHORIZED, "E-mail ou senha inválidos.");
-        return issue(user);
+    public AuthResponse loginCustomer(String email, String password) {
+        return authenticate(email, password, Role.CUSTOMER);
     }
 
     @Transactional(readOnly = true)
-    public AuthResponse loginMerchant(MerchantLoginRequest request) {
-        UserEntity user = authenticate(request.email(), request.password());
-        String cpf = request.cpf().replaceAll("\\D", "");
-        if (user.getRole() != Role.MERCHANT || user.getCpf() == null || !user.getCpf().equals(cpf))
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Dados de acesso do lojista inválidos.");
-        return issue(user);
+    public AuthResponse loginMerchant(String email, String password, String cpf) {
+        return authenticate(email, password, Role.MERCHANT);
     }
 
-    private UserEntity authenticate(String email, String password) {
+    @Transactional(readOnly = true)
+    public UserSummary currentUser(String email) {
+        return users.findByEmailIgnoreCase(normalizeEmail(email))
+                .map(UserSummary::from)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Conta não encontrada."));
+    }
+
+    private AuthResponse authenticate(String email, String password, Role expectedRole) {
         String normalizedEmail = normalizeEmail(email);
-        try {
-            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(normalizedEmail, password));
-        } catch (RuntimeException ex) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "E-mail ou senha inválidos.");
-        }
-        return users.findByEmailIgnoreCase(normalizedEmail).filter(UserEntity::isActive)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "E-mail ou senha inválidos."));
-    }
-
-    private AuthResponse issue(UserEntity user) {
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(normalizedEmail, password));
+        UserEntity user = users.findByEmailIgnoreCase(normalizedEmail)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Credenciais inválidas."));
+        if (user.getRole() != expectedRole) throw new ApiException(HttpStatus.FORBIDDEN, "Acesso não autorizado para este perfil.");
         Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder().issuer("usereuser-store").issuedAt(now)
-                .expiresAt(now.plusSeconds(tokenTtlSeconds)).subject(user.getEmail())
-                .claim("email", user.getEmail()).claim("name", user.getName())
-                .claim("roles", List.of(user.getRole().name())).build();
-        String token = jwtEncoder.encode(JwtEncoderParameters.from(
-                org.springframework.security.oauth2.jwt.JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
-        return new AuthResponse(token, "Bearer", tokenTtlSeconds,
-                user.getRole().name().toLowerCase(Locale.ROOT), user.getName(), user.getEmail(), user.getPhone());
+        Instant expiresAt = now.plusSeconds(tokenTtlSeconds);
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer("usereuser")
+                .issuedAt(now)
+                .expiresAt(expiresAt)
+                .subject(user.getEmail())
+                .claim("role", user.getRole().name())
+                .claim("roles", List.of("ROLE_" + user.getRole().name()))
+                .build();
+        JwsHeader jwsHeader = JwsHeader.with(MacAlgorithm.HS256).build();
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
+        return new AuthResponse(token, "Bearer", expiresAt.getEpochSecond(), user.getRole().name().toLowerCase(Locale.ROOT), user.getName(), user.getEmail(), user.getPhone());
     }
 
-    private String normalizeEmail(String email) { return email.trim().toLowerCase(Locale.ROOT); }
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
 }

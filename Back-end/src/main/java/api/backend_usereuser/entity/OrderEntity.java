@@ -49,6 +49,9 @@ public class OrderEntity {
     @Column(nullable = false, length = 24)
     private String status = "RECEIVED";
 
+    @Column(name = "idempotency_key", length = 100)
+    private String idempotencyKey;
+
     @Column(name = "delivery_date")
     private LocalDate deliveryDate;
 

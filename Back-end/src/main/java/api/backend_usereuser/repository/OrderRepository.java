@@ -13,6 +13,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findAllByCustomer_IdOrderByCreatedAtDesc(UUID customerId);
     List<OrderEntity> findAllByCustomer_IdOrCustomerEmailIgnoreCaseOrderByCreatedAtDesc(UUID customerId, String customerEmail);
     List<OrderEntity> findAllByOrderByCreatedAtDesc();
+    java.util.Optional<OrderEntity> findByIdempotencyKey(String idempotencyKey);
 
     @Modifying
     @Query(value = "UPDATE orders SET customer_name = 'Conta excluída', customer_email = :email, " +

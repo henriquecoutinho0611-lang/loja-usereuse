@@ -10,7 +10,6 @@ import api.backend_usereuser.entity.OrderItemEntity;
 import api.backend_usereuser.entity.ProductEntity;
 import api.backend_usereuser.entity.UserEntity;
 import api.backend_usereuser.exception.ApiException;
-import api.backend_usereuser.mapper.OrderMapper;
 import api.backend_usereuser.repository.OrderRepository;
 import api.backend_usereuser.repository.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -18,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -27,22 +27,26 @@ public class OrderService {
     private final OrderRepository orders;
     private final ProductService products;
     private final UserRepository users;
-    private final OrderMapper mapper;
     private final ShippingService shipping;
 
     public OrderService(OrderRepository orders, ProductService products,
-                        UserRepository users, OrderMapper mapper, ShippingService shipping) {
+                        UserRepository users, ShippingService shipping) {
         this.orders = orders;
         this.products = products;
         this.users = users;
-        this.mapper = mapper;
         this.shipping = shipping;
     }
 
     @Transactional
-    public OrderResponse create(OrderRequest request, String authenticatedEmail) {
-        UserEntity user = resolveCustomer(authenticatedEmail);
+    public OrderResponse create(OrderRequest request, String authenticatedEmail, String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            var existing = orders.findByIdempotencyKey(idempotencyKey.trim());
+            if (existing.isPresent()) {
+                return OrderResponse.from(existing.get());
+            }
+        }
 
+        UserEntity user = resolveCustomer(authenticatedEmail);
         ShippingQuoteResponse shippingQuote = shipping.quoteForOrder(request.zipCode().replaceAll("\\D", ""));
 
         OrderEntity order = new OrderEntity();
@@ -54,6 +58,9 @@ public class OrderService {
         order.setAddress(request.address().trim());
         order.setShippingCost(shippingQuote.price() == null ? BigDecimal.ZERO : shippingQuote.price());
         order.setShippingCategory(shippingQuote.category());
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            order.setIdempotencyKey(idempotencyKey.trim());
+        }
 
         BigDecimal total = BigDecimal.ZERO;
         for (OrderRequest.Item requestedItem : request.items()) {
@@ -82,7 +89,7 @@ public class OrderService {
         }
         order.setTotal(total.add(order.getShippingCost()));
         order = orders.save(order);
-        return mapper.toResponse(order);
+        return OrderResponse.from(order);
     }
 
     @Transactional(readOnly = true)
@@ -90,7 +97,7 @@ public class OrderService {
         UserEntity user = users.findByEmailIgnoreCase(normalizeEmail(authenticatedEmail))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Conta não encontrada."));
         return orders.findAllByCustomer_IdOrCustomerEmailIgnoreCaseOrderByCreatedAtDesc(user.getId(), user.getEmail())
-                .stream().map(mapper::toResponse).toList();
+                .stream().map(OrderResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
@@ -99,53 +106,63 @@ public class OrderService {
     }
 
     @Transactional
-    public MerchantOrderResponse updateDeliveryDate(UUID id, java.time.LocalDate deliveryDate) {
+    public MerchantOrderResponse updateStatus(UUID id, String status) {
+        OrderEntity order = orders.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Pedido não encontrado."));
+        order.setStatus(status.toUpperCase(Locale.ROOT));
+        return toMerchantResponse(orders.save(order));
+    }
+
+    @Transactional
+    public MerchantOrderResponse updateDeliveryDate(UUID id, LocalDate deliveryDate) {
         OrderEntity order = orders.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Pedido não encontrado."));
         order.setDeliveryDate(deliveryDate);
         return toMerchantResponse(orders.save(order));
     }
 
-    @Transactional
-    public MerchantOrderResponse updateStatus(UUID id, String status) {
-        OrderEntity order = orders.findById(id)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Pedido não encontrado."));
-        order.setStatus(status);
-        return toMerchantResponse(orders.saveAndFlush(order));
-    }
-
-    private MerchantOrderResponse toMerchantResponse(OrderEntity order) {
-        return new MerchantOrderResponse(
-                order.getId(), "PED-" + order.getId().toString().substring(0, 8).toUpperCase(),
-                order.getStatus(), order.getTotal(), order.getCreatedAt(),
-                order.getCustomerName(), order.getCustomerEmail(), order.getCustomerPhone(),
-                order.getZipCode(), order.getAddress(), order.getDeliveryDate(),
-                order.getShippingCost(), order.getShippingCategory(),
-                order.getItems().stream().map(mapper::toResponse).toList());
-    }
-
-    private void validateSelection(String selected, List<String> available, String label) {
-        if (available == null || available.isEmpty()) {
-            if (selected != null && !selected.isBlank()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Este produto não oferece opção para " + label + ".");
-            }
-            return;
-        }
-        if (selected == null || !available.contains(selected)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Escolha uma opção válida para " + label + ".");
-        }
-    }
-
     private UserEntity resolveCustomer(String authenticatedEmail) {
-        if (authenticatedEmail == null || authenticatedEmail.isBlank()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Entre em uma conta antes de comprar.");
-        }
+        if (authenticatedEmail == null || authenticatedEmail.isBlank())
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Faça login para concluir o pedido.");
         return users.findByEmailIgnoreCase(normalizeEmail(authenticatedEmail))
-                .filter(UserEntity::isActive)
-                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "Conta não encontrada para vincular este pedido."));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Faça login para concluir o pedido."));
     }
 
     private String normalizeEmail(String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void validateSelection(String value, List<String> available, String field) {
+        if (available == null || available.isEmpty()) {
+            if (value != null && !value.isBlank())
+                throw new ApiException(HttpStatus.BAD_REQUEST, "O produto não aceita seleção de " + field + ".");
+            return;
+        }
+        if (value == null || value.isBlank())
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Selecione a " + field + ".");
+        if (available.stream().noneMatch(value::equalsIgnoreCase))
+            throw new ApiException(HttpStatus.BAD_REQUEST, "A opção de " + field + " é inválida.");
+    }
+
+    private MerchantOrderResponse toMerchantResponse(OrderEntity order) {
+        String orderNumber = "PED-" + order.getId().toString().substring(0, 8).toUpperCase();
+        List<OrderResponse.Item> items = order.getItems() == null ? List.of() : order.getItems().stream()
+                .map(OrderResponse.Item::from).toList();
+        return new MerchantOrderResponse(
+                order.getId(),
+                orderNumber,
+                order.getStatus(),
+                order.getTotal(),
+                order.getCreatedAt(),
+                order.getCustomerName(),
+                order.getCustomerEmail(),
+                order.getCustomerPhone(),
+                order.getZipCode(),
+                order.getAddress(),
+                order.getDeliveryDate(),
+                order.getShippingCost(),
+                order.getShippingCategory(),
+                items
+        );
     }
 }

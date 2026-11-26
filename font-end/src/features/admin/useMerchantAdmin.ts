@@ -81,6 +81,7 @@ export function useMerchantAdmin({
   const [adminProducts, setAdminProducts] = useState<Product[]>([]);
   const [adminOrders, setAdminOrders] = useState<MerchantOrder[]>([]);
   const [adminBusy, setAdminBusy] = useState(false);
+  const [productSavingBusy, setProductSavingBusy] = useState(false);
   const [loadingAdminOrders, setLoadingAdminOrders] = useState(false);
   const [deliveryDateBusy, setDeliveryDateBusy] = useState("");
   const [deliveryDateDrafts, setDeliveryDateDrafts] = useState<Record<string, string>>({});
@@ -335,19 +336,50 @@ export function useMerchantAdmin({
 
   async function saveProduct(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setAdminBusy(true);
+    if (!productForm.title.trim()) {
+      showNotice("Informe o título do produto.");
+      return;
+    }
+    if (!productForm.description.trim()) {
+      showNotice("Informe a descrição do produto.");
+      return;
+    }
+    if (!productForm.department.trim()) {
+      showNotice("Informe o departamento.");
+      return;
+    }
+    const price = Number(productNumericDrafts.price);
+    if (!productNumericDrafts.price.trim() || isNaN(price) || price <= 0) {
+      showNotice("Informe um preço válido maior que zero.");
+      return;
+    }
+    const width = Number(productNumericDrafts.width);
+    if (!productNumericDrafts.width.trim() || isNaN(width) || width <= 0) {
+      showNotice("Informe a largura do produto.");
+      return;
+    }
+    const height = Number(productNumericDrafts.height);
+    if (!productNumericDrafts.height.trim() || isNaN(height) || height <= 0) {
+      showNotice("Informe a altura do produto.");
+      return;
+    }
+
+    setProductSavingBusy(true);
     try {
       let image = productForm.image;
       let ambientImage = productForm.ambientImage;
       if (mainImageFile) image = (await storeApi.uploadProductImage(mainImageFile)).url;
-      if (!image) throw new Error("Escolha a imagem principal do produto.");
+      if (!image) {
+        showNotice("Escolha a imagem principal do produto.");
+        return;
+      }
       if (ambientImageFile) ambientImage = (await storeApi.uploadProductImage(ambientImageFile)).url;
       const payload: ProductRequest = {
         ...productForm,
-        price: Number(productNumericDrafts.price),
+        price,
         oldPrice: productNumericDrafts.oldPrice.trim() ? Number(productNumericDrafts.oldPrice) : null,
-        width: Number(productNumericDrafts.width),
-        height: Number(productNumericDrafts.height),
+        width,
+        height,
         image,
         ambientImage: ambientImage || null,
         ironColors: parseProductOptions(productOptionDrafts.ironColors),
@@ -365,7 +397,7 @@ export function useMerchantAdmin({
     } catch (error) {
       showNotice(storeApi.errorMessage(error, "Não foi possível salvar o produto."));
     } finally {
-      setAdminBusy(false);
+      setProductSavingBusy(false);
     }
   }
 
@@ -398,6 +430,7 @@ export function useMerchantAdmin({
     adminProducts,
     adminOrders,
     adminBusy,
+    productSavingBusy,
     loadingAdminOrders,
     deliveryDateBusy,
     deliveryDateDrafts,

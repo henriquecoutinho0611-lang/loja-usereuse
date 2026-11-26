@@ -2,10 +2,15 @@ import { useCallback, useState } from "react";
 import type { AccountProfile, AuthResponse } from "../app/models";
 import type { UserRole } from "../routes/types";
 
+function normalizeRole(role: string | null): UserRole {
+  if (!role) return null;
+  const lower = role.toLowerCase();
+  return lower === "customer" || lower === "merchant" ? lower : null;
+}
+
 function readSavedRole(): UserRole {
   if (!sessionStorage.getItem("loja_access_token")) return null;
-  const role = sessionStorage.getItem("loja_user_role");
-  return role === "customer" || role === "merchant" ? role : null;
+  return normalizeRole(sessionStorage.getItem("loja_user_role"));
 }
 
 function readSavedAccount(role: UserRole): AccountProfile | null {
@@ -24,8 +29,9 @@ export function useAuth() {
   const [account, setAccount] = useState<AccountProfile | null>(() => readSavedAccount(readSavedRole()));
 
   function saveSession(response: AuthResponse): AccountProfile {
+    const normalizedRole = normalizeRole(response.role);
     sessionStorage.setItem("loja_access_token", response.accessToken);
-    sessionStorage.setItem("loja_user_role", response.role);
+    sessionStorage.setItem("loja_user_role", normalizedRole || response.role.toLowerCase());
     sessionStorage.setItem("loja_user_email", response.email);
     sessionStorage.setItem("loja_user_name", response.name || "");
     sessionStorage.setItem("loja_user_phone", response.phone || "");
@@ -34,9 +40,9 @@ export function useAuth() {
       name: response.name,
       email: response.email,
       phone: response.phone || "",
-      role: response.role.toUpperCase(),
+      role: (normalizedRole || response.role).toUpperCase(),
     };
-    setRole(response.role);
+    setRole(normalizedRole);
     setAccount(profile);
     return profile;
   }
